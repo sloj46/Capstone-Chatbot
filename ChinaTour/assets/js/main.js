@@ -151,6 +151,65 @@
     });
 
     let hasSendMessage = false; // 是否是第一条消息
+    let city = ''; // 城市变量
+    let latitude = ''; // 纬度变量
+    let longitude = ''; // 经度变量
+
+    // 首先通过浏览器定位获取地理位置信息
+    const script = document.createElement('script');
+    window._AMapSecurityConfig = {
+      securityJsCode: "86011e785c01b84d441cb95e32e91fe7",
+    };
+    script.src = `https://webapi.amap.com/maps?v=2.0&key=6bb0b3a71f5734007d182ebfb0c51f1a`;
+    document.head.appendChild(script);
+
+    script.onload = function () {
+      AMap.plugin('AMap.Geolocation', function () {
+        var geolocation = new AMap.Geolocation({
+          enableHighAccuracy: true, // 是否使用高精度定位，默认：true
+          // timeout: 20000, // 设置定位超时时间，默认：无穷大
+          // offset: [10, 20],  // 定位按钮的停靠位置的偏移量
+          // zoomToAccuracy: true,  //  定位成功后调整地图视野范围使定位位置及精度范围视野内可见，默认：false
+          // position: 'RB' //  定位按钮的排放位置,  RB表示右下
+        })
+
+        geolocation.getCityInfo(function (status, result) {
+          if (status == 'complete') {
+            onComplete(result);
+            city = result.city; // 提取city
+
+            console.log(city);
+          } else {
+            onError(result);
+            console.log('定位失败');
+          }
+        });
+
+        geolocation.getCurrentPosition(function (status, result) {
+          if (status == 'complete') {
+            onComplete(result);
+            [latitude, longitude] = [result.position.lat, result.position.lng]; // 提取纬度和经度
+            console.log(latitude, longitude);
+            console.log(result);
+          } else {
+            onError(result);
+            console.log('定位失败');
+          }
+        });
+
+        function onComplete(data) {
+          // data是具体的定位信息
+        }
+
+        function onError(data) {
+          // 定位出错
+        }
+      })
+    }
+
+
+
+
 
     async function sendMessage() {
       const message = chatInput.value.trim();
@@ -227,7 +286,6 @@
       // }
 
 
-      
 
       try {
         const response = await fetch('http://localhost:8000/api/chat', {
@@ -237,8 +295,12 @@
             'Accept': 'text/event-stream'
           },
           body: JSON.stringify({
-            inputs: {},
-            query: message,
+            inputs: {
+              city: city,          // "温州市"
+              latitude: latitude,
+              longitude: longitude,        // 经度, 纬度
+            },
+            query: message, // 发送城市和经纬度
             response_mode: "streaming",
             conversation_id: "",
             user: "user-" + Date.now()
@@ -247,24 +309,87 @@
 
         if (!response.ok) throw new Error(`API请求失败: ${response.status}`);
 
+        // const reader = response.body.getReader();
+        // const decoder = new TextDecoder('utf-8');
+        // let buffer = '';
+        // let botMessageElement = null;
+        // let jsonBuffer = ''; // 新增：用于拼接不完整的JSON
+        // let isInsideJson = false; // 标记是否开始接收JSON结构
+
+        // while (true) {
+        //   const { done, value } = await reader.read();
+        //   if (done) {
+        //     // 最终处理可能残留的数据
+
+        //     break;
+        //   }
+
+        //   buffer += decoder.decode(value, { stream: true });
+        //   const lines = buffer.split('\n');
+        //   buffer = lines.pop() || '';
+
+
+        //   for (const line of lines) {
+        //     if (!line.startsWith('data: ')) continue;
+
+        //     try {
+        //       const jsonStr = line.replace('data: ', '').trim();
+        //       if (!jsonStr) continue;
+
+        //       const data = JSON.parse(jsonStr);
+        //       if (data.event === "message") {
+        //         if (!botMessageElement) {
+        //           botMessageElement = document.createElement('div');
+        //           botMessageElement.className = 'message-bubble bot-message p-3 mb-2';
+        //           document.querySelector('.chat-messages').appendChild(botMessageElement);
+        //         }
+
+        //         botMessageElement.textContent += data.answer;
+        //         document.querySelector('.chat-messages').scrollTop =
+        //           document.querySelector('.chat-messages').scrollHeight;
+        //       }
+        //     } catch (e) {
+        //       console.error('解析 JSON 失败:', e, '原始行:', line);
+        //     }
+        //   }
+        // }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder('utf-8');
         let buffer = '';
         let botMessageElement = null;
+        let hasProcessedKeyword = false; // 标记是否已处理关键词
+        let responseBuffer = ''; // 用于存储完整的响应内容
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
-            // 响应结束后强制显示地图（测试用）
-            showTestMap();
+            // 流结束时检查是否有未处理的标记
+            console.log('流结束，检查未处理的内容');
+            if (!botMessageElement) {
+              botMessageElement = document.createElement('div');
+              botMessageElement.className = 'message-bubble bot-message p-3 mb-2';
+              document.querySelector('.chat-messages').appendChild(botMessageElement);
+            }
+
+            let [displayText, keywordPart] = responseBuffer.split('<cityKeyword>');
+
+            botMessageElement.textContent += displayText; // 显示最后的内容
+            document.querySelector('.chat-messages').scrollTop =
+                  document.querySelector('.chat-messages').scrollHeight;
+
+            let cityKeyRes = processRemainingContent(responseBuffer);
+            let city = cityKeyRes.city;
+            let keyword = cityKeyRes.keyword;
+            if (city && keyword) {
+              showTestMap(city, keyword);
+            }
             break;
           }
 
           buffer += decoder.decode(value, { stream: true });
-
-          // 处理可能的多行数据
           const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // 保存不完整的行
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
             if (!line.startsWith('data: ')) continue;
@@ -275,18 +400,30 @@
 
               const data = JSON.parse(jsonStr);
               if (data.event === "message") {
-                if (!botMessageElement) {
-                  botMessageElement = document.createElement('div');
-                  botMessageElement.className = 'message-bubble bot-message p-3 mb-2';
-                  document.querySelector('.chat-messages').appendChild(botMessageElement);
-                }
+                
 
-                botMessageElement.textContent += data.answer;
-                document.querySelector('.chat-messages').scrollTop =
-                  document.querySelector('.chat-messages').scrollHeight;
+                // 核心处理逻辑
+                // if (data.answer.includes('<cityKeyword>') && !hasProcessedKeyword) {
+                  console.log('检测到关键词标记');
+                  let answerText = data.answer;
+
+                  // 显示标记前的内容
+                  responseBuffer += answerText;
+                  // botMessageElement.textContent += displayText;
+                  
+
+                  // hasProcessedKeyword = true; // 标记已处理
+                // } else if (!hasProcessedKeyword) {
+                  // 普通内容直接显示
+                  // botMessageElement.textContent += data.answer;
+                  // console.log('普通内容输出');
+                // }
+
+                
+                
               }
             } catch (e) {
-              console.error('解析 JSON 失败:', e, '原始行:', line);
+              console.error('解析失败:', e);
             }
           }
         }
@@ -295,14 +432,64 @@
         addMessage('服务暂时不可用: ' + error.message, 'bot');
       }
     }
-      
 
-      // 测试地图显示
+
+    // 处理流结束时可能残留的内容
+    function processRemainingContent(content) {
+      if (content.includes('<cityKeyword>')) {
+        const [displayText, keywordPart] = content.split('<cityKeyword>');
+        // if (botMessageElement) {
+        //   botMessageElement.textContent += displayText;
+        // }
+
+        const [city, keyword] = keywordPart.split(',').map(item => item.trim());
+        console.log('最终提取参数:', { city, keyword });
+        return {city, keyword};
+      }
+    }
+
+
+    // 处理完整JSON的函数
+    function processJsonBuffer(jsonStr) {
+      try {
+        // 修复可能的转义字符问题
+        const answerObj = safeJsonParse(jsonStr);
+
+        // 渲染文本
+        if (!botMessageElement) {
+          botMessageElement = createMessageElement();
+        }
+        botMessageElement.textContent = answerObj.textResponse || answerObj.text;
+
+        // 提取结构化数据
+        if (answerObj.city && answerObj.keyword) {
+          console.log('提取到地图参数:', {
+            city: answerObj.city,
+            keyword: answerObj.keyword
+          });
+          // 这里调用地图API
+          AMapPlaceSearch(answerObj.city, answerObj.keyword);
+        }
+      } catch (e) {
+        console.error('JSON解析失败:', e, '原始内容:', jsonStr);
+      }
+    }
+
+    function createMessageElement() {
+      const el = document.createElement('div');
+      el.className = 'message-bubble bot-message p-3 mb-2';
+      document.querySelector('.chat-messages').appendChild(el);
+      return el;
+    }
+
+
+
+    // 测试地图显示
     //   showTestMap();
     // }
 
     // 测试地图显示
-    function showTestMap() {
+    function showTestMap(query_city, query_keyword) {
       // 1. 创建地图容器（直接使用你的CSS类名）
       const mapContainer = document.createElement('div');
       mapContainer.className = 'chat-map'; // 关键点：使用你的现有CSS类
@@ -323,7 +510,7 @@
           script.onload = () => renderMap(mapContainer.id);
           document.head.appendChild(script);
         } else {
-          renderMap(mapContainer.id);
+          renderMap(mapContainer.id, query_city, query_keyword);
         }
       };
 
@@ -342,7 +529,7 @@
       }
     }
 
-    function renderMap(containerId) {
+    function renderMap(containerId, query_city, query_keyword) {
       const container = document.getElementById(containerId);
       if (!container || container.offsetHeight === 0) return;
 
@@ -367,11 +554,11 @@
           map: map,
           autoFitView: true,
           pageSize: 5,
-          // city: "010", // 兴趣点城市
+          city: query_city, // 兴趣点城市
           // citylimit: true,  //是否强制限制在设置的城市内搜索
         });
 
-        placeSearch.search('雁荡山', function (status, result) {
+        placeSearch.search(query_keyword, function (status, result) {
           // 查询成功时，result即对应匹配的POI信息
           console.log(result)
 
@@ -383,7 +570,7 @@
               position: poi.location,   // 经纬度对象，也可以是经纬度构成的一维数组[116.39, 39.9]
               title: poi.name,
               map: map,
-              
+
             });
 
             // 将创建的点标记添加到已有的地图实例：
