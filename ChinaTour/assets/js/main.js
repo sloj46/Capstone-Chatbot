@@ -374,9 +374,9 @@
 
             let [displayText, keywordPart] = responseBuffer.split('<cityKeyword>');
 
-            botMessageElement.textContent += displayText; // 显示最后的内容
+            botMessageElement.innerHTML += marked.parse(displayText); // 显示最后的内容
             document.querySelector('.chat-messages').scrollTop =
-                  document.querySelector('.chat-messages').scrollHeight;
+              document.querySelector('.chat-messages').scrollHeight;
 
             let cityKeyRes = processRemainingContent(responseBuffer);
             let city = cityKeyRes.city;
@@ -400,27 +400,27 @@
 
               const data = JSON.parse(jsonStr);
               if (data.event === "message") {
-                
+
 
                 // 核心处理逻辑
                 // if (data.answer.includes('<cityKeyword>') && !hasProcessedKeyword) {
-                  console.log('检测到关键词标记');
-                  let answerText = data.answer;
+                console.log('检测到关键词标记');
+                let answerText = data.answer;
 
-                  // 显示标记前的内容
-                  responseBuffer += answerText;
-                  // botMessageElement.textContent += displayText;
-                  
+                // 显示标记前的内容
+                responseBuffer += answerText;
+                // botMessageElement.textContent += displayText;
 
-                  // hasProcessedKeyword = true; // 标记已处理
+
+                // hasProcessedKeyword = true; // 标记已处理
                 // } else if (!hasProcessedKeyword) {
-                  // 普通内容直接显示
-                  // botMessageElement.textContent += data.answer;
-                  // console.log('普通内容输出');
+                // 普通内容直接显示
+                // botMessageElement.textContent += data.answer;
+                // console.log('普通内容输出');
                 // }
 
-                
-                
+
+
               }
             } catch (e) {
               console.error('解析失败:', e);
@@ -429,7 +429,47 @@
         }
       } catch (error) {
         console.error('请求失败:', error);
-        addMessage('服务暂时不可用: ' + error.message, 'bot');
+        // addMessage('服务暂时不可用: ' + error.message, 'bot');
+        // 创建错误消息和重新生成按钮
+        // 创建错误消息和重新生成按钮
+        const errorMessage = '服务暂时不可用: ' + error.message;
+
+        // 创建消息容器
+        const messageContainer = document.createElement('div');
+        messageContainer.className = 'message-container d-flex align-items-start';
+
+        // 创建错误消息气泡
+        const errorMessageElement = document.createElement('div');
+        errorMessageElement.className = 'message-bubble bot-message p-3 mb-2 text-danger flex-grow-1';
+        errorMessageElement.textContent = errorMessage;
+        messageContainer.appendChild(errorMessageElement);
+
+        // 创建重新生成按钮
+        const retryButton = document.createElement('button');
+        retryButton.className = 'retry-button btn btn-link p-0 ms-2';
+        retryButton.innerHTML = '<i class="bi bi-arrow-clockwise" data-bs-toggle="tooltip" title="Retry"></i>';
+
+        // 添加按钮到容器
+        messageContainer.appendChild(retryButton);
+
+        // 添加到聊天区域
+        document.querySelector('.chat-messages').appendChild(messageContainer);
+
+        // 初始化Bootstrap工具提示
+        new bootstrap.Tooltip(retryButton.querySelector('.bi-arrow-clockwise'));
+
+        // 保存当前消息以便重新生成时使用
+        const currentMessage = message;
+
+        // 重新生成按钮点击事件
+        retryButton.addEventListener('click', async () => {
+          // 移除错误消息和按钮
+          messageContainer.remove();
+
+          // 重新发送消息
+          chatInput.value = currentMessage;
+          await sendMessage();
+        });
       }
     }
 
@@ -444,7 +484,7 @@
 
         const [city, keyword] = keywordPart.split(',').map(item => item.trim());
         console.log('最终提取参数:', { city, keyword });
-        return {city, keyword};
+        return { city, keyword };
       }
     }
 

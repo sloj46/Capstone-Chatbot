@@ -990,11 +990,34 @@ section,
   word-break: break-word; /* 长文本自动换行 */
 }
 
+.retry-button {
+  color: #6c757d; /* 默认灰色 */
+  transition: color 0.2s;
+  align-self: center; /* 垂直居中 */
+}
+
+.retry-button:hover {
+  color: #0d6efd; /* 悬停时变为蓝色 */
+}
+
+.message-container {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+/* 调整工具提示样式 */
+.tooltip-inner {
+  background-color: #6c757d;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+}
+
 .user-message {
   background: #007bff;
   color: white;
   margin-left: auto;
   border-bottom-right-radius: 4px; /* 右下角小圆角 */
+  margin-bottom: auto;
 }
 
 .bot-message {
@@ -1002,6 +1025,7 @@ section,
   color: white;
   margin-right: auto; /* 靠左对齐 */
   border-bottom-left-radius: 4px; /* 左下角小圆角 */
+  margin-bottom: auto;
 }
 
 
