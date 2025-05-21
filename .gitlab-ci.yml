@@ -15,6 +15,5 @@ deploy-job:
   - ssh-keyscan -H ${SERVER_IP} >> ~/.ssh/known_hosts
   script:
       - echo "Start deploying..."
-      # - sshpass -p MYyj25@@ scp ./webpage/index.html root@116.62.153.84:/var/www/html/
       - sshpass -e scp -r ./ChinaTour/* root@${SERVER_IP}:/var/www/html/
       - ssh root@${SERVER_IP} 'sudo systemctl reload nginx'
