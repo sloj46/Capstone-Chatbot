@@ -1,0 +1,20 @@
+stages:
+  - deploy 
+
+deploy-job:
+  tags: 
+    - runnertest
+  stage: deploy
+
+  before_script:
+  - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+  - eval $(ssh-agent -s)
+  - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+  - mkdir -p ~/.ssh
+  - chmod 700 ~/.ssh
+  - ssh-keyscan -H ${SERVER_IP} >> ~/.ssh/known_hosts
+  script:
+      - echo "Start deploying..."
+      # - sshpass -p MYyj25@@ scp ./webpage/index.html root@116.62.153.84:/var/www/html/
+      - sshpass -e scp -r ./ChinaTour/* root@${SERVER_IP}:/var/www/html/
+      - ssh root@${SERVER_IP} 'sudo systemctl reload nginx'
